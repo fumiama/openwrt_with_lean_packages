@@ -1,0 +1,3 @@
+[submodule "package/lean/luci-app-ssr-plus"]
+	path = package/lean/luci-app-ssr-plus
+	url = https://github.com/fumiama/luci-app-ssr-plus.git
