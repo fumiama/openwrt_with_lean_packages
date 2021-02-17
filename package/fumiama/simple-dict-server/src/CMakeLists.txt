@@ -6,6 +6,6 @@ ADD_DEFINITIONS(-Wall -Werror --std=gnu99 -Wmissing-declarations)
 SET(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 
 ADD_EXECUTABLE(simple-dict-server simple-dict-server.c)
-TARGET_LINK_LIBRARIES(simple-dict-server)
+TARGET_LINK_LIBRARIES(simple-dict-server pthread)
 
 INSTALL(TARGETS simple-dict-server RUNTIME DESTINATION bin)
