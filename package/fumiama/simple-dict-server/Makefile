@@ -35,6 +35,7 @@ define Package/$(PKG_NAME)/postinst
 endef
 
 Package/$(PKG_NAME)/postrm
+	#!/bin/sh
 	sed -i '/simple-dict-server/d' /etc/rc.local
 endef
 
