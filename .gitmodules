@@ -1,3 +1,15 @@
 [submodule "package/lean/luci-app-ssr-plus"]
 	path = package/lean/luci-app-ssr-plus
 	url = https://github.com/fumiama/luci-app-ssr-plus.git
+[submodule "package/fumiama/.noddos"]
+	path = package/fumiama/.noddos
+	url = https://github.com/fumiama/noddos.git
+[submodule "package/fumiama/fullconenat"]
+	path = package/fumiama/fullconenat
+	url = https://github.com/LGA1150/openwrt-fullconenat.git
+[submodule "package/fumiama/.fullconenat_patch"]
+	path = package/fumiama/.fullconenat_patch
+	url = https://github.com/LGA1150/fullconenat-fw3-patch
+[submodule "package/fumiama/useful"]
+	path = package/fumiama/useful
+	url = https://github.com/kenzok8/openwrt-packages.git

@@ -1,8 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-diskman
-PKG_VERSION:=v0.2.10
-PKG_RELEASE:=beta
+PKG_VERSION:=v0.2.11
 PKG_MAINTAINER:=lisaac <https://github.com/lisaac/luci-app-diskman>
 PKG_LICENSE:=AGPL-3.0
 
@@ -74,7 +73,7 @@ define Package/$(PKG_NAME)/install
 	# $(INSTALL_DIR) $(1)/www
 	# cp -pR $(PKG_BUILD_DIR)/htdoc/* $(1)/www
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci
-	cp -pR $(PKG_BUILD_DIR)/luasrc/* $(1)/usr/lib/lua/luci/
+	cp -pR $(PKG_BUILD_DIR)/applications/luci-app-diskman/luasrc/* $(1)/usr/lib/lua/luci/
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/i18n
 	$$(foreach po,$$(shell find $(PKG_BUILD_DIR)/po/*/*.po), \
 		po2lmo $$(po) \
