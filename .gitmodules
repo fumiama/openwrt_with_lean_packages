@@ -13,3 +13,9 @@
 [submodule "package/fumiama/useful"]
 	path = package/fumiama/useful
 	url = https://github.com/kenzok8/openwrt-packages.git
+[submodule "package/.lean-lede"]
+	path = package/.lean-lede
+	url = https://github.com/coolsnowwolf/lede.git
+[submodule "package/fumiama/luci-theme-rosy"]
+	path = package/fumiama/luci-theme-rosy
+	url = https://github.com/fumiama/luci-theme-rosy.git
