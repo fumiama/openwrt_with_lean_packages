@@ -23,8 +23,14 @@
 #define SETPASS "minamoto"
 
 int fd;
-socklen_t struct_len = sizeof(struct sockaddr_in6);
-struct sockaddr_in6 server_addr;
+
+#ifdef LISTEN_ON_IPV6
+    socklen_t struct_len = sizeof(struct sockaddr_in6);
+    struct sockaddr_in6 server_addr;
+#else
+    socklen_t struct_len = sizeof(struct sockaddr_in);
+    struct sockaddr_in server_addr;
+#endif
 
 char *data_path;
 char *kanban_path;
@@ -71,11 +77,18 @@ int s3_set_data(THREADTIMER *timer);
 int bind_server(uint16_t port, u_int try_times) {
     int fail_count = 0;
     int result = -1;
-    server_addr.sin6_family = AF_INET6;
-    server_addr.sin6_port = htons(port);
-    bzero(&(server_addr.sin6_addr), sizeof(server_addr.sin6_addr));
-    
-    fd = socket(PF_INET6, SOCK_STREAM, 0);
+    #ifdef LISTEN_ON_IPV6
+        server_addr.sin6_family = AF_INET6;
+        server_addr.sin6_port = htons(port);
+        bzero(&(server_addr.sin6_addr), sizeof(server_addr.sin6_addr));
+        fd = socket(PF_INET6, SOCK_STREAM, 0);
+    #else
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(port);
+        server_addr.sin_addr.s_addr = INADDR_ANY;
+        bzero(&(server_addr.sin_zero), 8);
+        fd = socket(AF_INET, SOCK_STREAM, 0);
+    #endif
     while(!~(result = bind(fd, (struct sockaddr *)&server_addr, struct_len)) && fail_count++ < try_times) sleep(1);
     if(!~result && fail_count >= try_times) {
         puts("Bind server failure!");
@@ -120,6 +133,7 @@ int send_all(char* file_path, THREADTIMER *timer) {
         printf("Get file size: %u bytes.\n", file_size);
         off_t len = 0;
         #if __APPLE__
+            //è‹¹æœåŸºæœ¬æ²¡æœ‰å¤§ç«¯ï¼Œä¸ä½œå¤„ç†
             struct sf_hdtr hdtr;
             struct iovec headers;
             headers.iov_base = &file_size;
@@ -131,7 +145,18 @@ int send_all(char* file_path, THREADTIMER *timer) {
             re = !sendfile(fileno(fp), timer->accept_fd, 0, &len, &hdtr, 0);
             if(!re) perror("Sendfile");
         #else
-            send(timer->accept_fd, &file_size, sizeof(uint32_t), 0);
+            #ifdef WORDS_BIGENDIAN
+                uint32_t little_fs;
+                char* q = (char*)(&little_fs);
+                char* p = (char*)(&file_size);
+                q[0] = p[3];
+                q[1] = p[2];
+                q[2] = p[1];
+                q[3] = p[0];
+                send(timer->accept_fd, &little_fs, sizeof(uint32_t), 0);
+            #else
+                send(timer->accept_fd, &file_size, sizeof(uint32_t), 0);
+            #endif
             re = sendfile(timer->accept_fd, fileno(fp), &len, file_size) >= 0;
             if(!re) perror("Sendfile");
         #endif
@@ -200,7 +225,16 @@ int s2_set(THREADTIMER *timer) {
 
 int s3_set_data(THREADTIMER *timer) {
     timer->status = 0;
-    uint32_t file_size = *(uint32_t*)(timer->data);
+    #ifdef WORDS_BIGENDIAN
+        uint32_t file_size;
+        char* p = (char*)(&file_size);
+        p[0] = timer->data[3];
+        p[1] = timer->data[2];
+        p[2] = timer->data[1];
+        p[3] = timer->data[0];
+    #else
+        uint32_t file_size = *(uint32_t*)(timer->data);
+    #endif
     printf("Set data size: %u\n", file_size);
     int is_first_data = 0;
     if(timer->numbytes == sizeof(uint32_t)) {
@@ -345,7 +379,7 @@ void handle_accept(void *p) {
                 buff[timer_pointer_of(p)->numbytes] = 0;
                 printf("Get %d bytes: %s\n", timer_pointer_of(p)->numbytes, buff);
                 puts("Check buffer");
-                //´¦Àí²¿·ÖÕ³Á¬
+                //å¤„ç†éƒ¨åˆ†ç²˜è¿
                 take_word(p, PASSWORD);
                 take_word(p, "get");
                 take_word(p, "cat");
@@ -364,7 +398,7 @@ void handle_accept(void *p) {
 
 void accept_client() {
     pid_t pid = fork();
-    while (pid > 0) {      //Ö÷½ø³Ì¼à¿Ø×Ó½ø³Ì×´Ì¬£¬Èç¹û×Ó½ø³ÌÒì³£ÖÕÖ¹ÔòÖØÆôÖ®
+    while (pid > 0) {      //ä¸»è¿›ç¨‹ç›‘æ§å­è¿›ç¨‹çŠ¶æ€ï¼Œå¦‚æœå­è¿›ç¨‹å¼‚å¸¸ç»ˆæ­¢åˆ™é‡å¯ä¹‹
         wait(NULL);
         puts("Server subprocess exited. Restart...");
         pid = fork();
