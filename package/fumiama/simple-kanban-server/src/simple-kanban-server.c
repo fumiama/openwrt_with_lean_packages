@@ -19,14 +19,15 @@
 #endif
 
 #define PASSWORD "fumiama"
+
 #define SETPASS "minamoto"
 
 int fd;
-//ssize_t numbytes;
-socklen_t struct_len = sizeof(struct sockaddr_in);
-struct sockaddr_in server_addr;
-//char buff[BUFSIZ];
-char *file_path;
+socklen_t struct_len = sizeof(struct sockaddr_in6);
+struct sockaddr_in6 server_addr;
+
+char *data_path;
+char *kanban_path;
 
 #define THREADCNT 16
 pthread_t accept_threads[THREADCNT];
@@ -44,52 +45,37 @@ struct THREADTIMER {
 };
 typedef struct THREADTIMER THREADTIMER;
 
-#define DATASIZE 64
-struct DICTBLK{
-    char key[(DATASIZE-1)];
-    u_char keysize;
-    char data[(DATASIZE-1)];
-    u_char datasize;
-};
-typedef struct DICTBLK DICTBLK;
-#define DICTBLKSZ sizeof(DICTBLK)
-DICTBLK dict;
-
-#define showUsage(program) printf("Usage: %s [-d] listen_port try_times dict_file\n\t-d: As daemon\n", program)
+#define showUsage(program) printf("Usage: %s [-d] listen_port try_times kanban_file data_file\n\t-d: As daemon\n", program)
 
 void accept_client();
 void accept_timer(void *p);
 int bind_server(uint16_t port, u_int try_times);
 int check_buffer(THREADTIMER *timer);
-void close_dict(FILE *fp);
-int close_and_send(THREADTIMER *timer, char *data, size_t numbytes);
-off_t file_size_of(const char* fname);
-int free_after_send(int accept_fd, char *data, size_t length);
+void close_file(FILE *fp);
+int close_file_and_send(THREADTIMER *timer, char *data, size_t numbytes);
 void handle_accept(void *accept_fd_p);
 void handle_pipe(int signo);
 void handle_quit(int signo);
 void kill_thread(THREADTIMER* timer);
 int listen_socket(u_int try_times);
-FILE *open_dict(int lock_type);
-int send_all(THREADTIMER *timer);
+FILE *open_file(char* file_path, int lock_type, char* mode);
+int send_all(char* file_path, THREADTIMER *timer);
 int send_data(int accept_fd, char *data, size_t length);
 int sm1_pwd(THREADTIMER *timer);
+off_t size_of_file(const char* fname);
 int s0_init(THREADTIMER *timer);
 int s1_get(THREADTIMER *timer);
 int s2_set(THREADTIMER *timer);
 int s3_set_data(THREADTIMER *timer);
-int s4_del(THREADTIMER *timer);
-int s5_list(THREADTIMER *timer);
 
 int bind_server(uint16_t port, u_int try_times) {
     int fail_count = 0;
     int result = -1;
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    bzero(&(server_addr.sin_zero), 8);
-
-    fd = socket(AF_INET, SOCK_STREAM, 0);
+    server_addr.sin6_family = AF_INET6;
+    server_addr.sin6_port = htons(port);
+    bzero(&(server_addr.sin6_addr), sizeof(server_addr.sin6_addr));
+    
+    fd = socket(PF_INET6, SOCK_STREAM, 0);
     while(!~(result = bind(fd, (struct sockaddr *)&server_addr, struct_len)) && fail_count++ < try_times) sleep(1);
     if(!~result && fail_count >= try_times) {
         puts("Bind server failure!");
@@ -124,36 +110,33 @@ int send_data(int accept_fd, char *data, size_t length) {
     }
 }
 
-int free_after_send(int accept_fd, char *data, size_t length) {
-    int re = send_data(accept_fd, data, length);
-    free(data);\
-    return re;
-}
-
-int send_all(THREADTIMER *timer) {
+int send_all(char* file_path, THREADTIMER *timer) {
     int re = 1;
-    FILE *fp = open_dict(LOCK_SH);
+    FILE *fp = open_file(file_path, LOCK_SH, "rb");
     if(fp) {
         timer->fp = fp;
         timer->is_open = 1;
-        off_t len = 0, file_size = file_size_of(file_path);
-        sprintf(timer->data, "%lld", file_size);
-        printf("Get file size: %s bytes.\n", timer->data);
-        uint32_t head_len = strlen(timer->data);
+        uint32_t file_size = (uint32_t)size_of_file(file_path);
+        printf("Get file size: %u bytes.\n", file_size);
+        off_t len = 0;
         #if __APPLE__
             struct sf_hdtr hdtr;
             struct iovec headers;
-            headers.iov_base = timer->data;
-            headers.iov_len = head_len;
+            headers.iov_base = &file_size;
+            headers.iov_len = sizeof(uint32_t);
             hdtr.headers = &headers;
             hdtr.hdr_cnt = 1;
-            sendfile(fileno(fp), timer->accept_fd, 0, &len, &hdtr, 0);
+            hdtr.trailers = NULL;
+            hdtr.trl_cnt = 0;
+            re = !sendfile(fileno(fp), timer->accept_fd, 0, &len, &hdtr, 0);
+            if(!re) perror("Sendfile");
         #else
-            send_data(timer->accept_fd, timer->data, head_len);
-            sendfile(timer->accept_fd, fileno(fp), &len, file_size);
+            send(timer->accept_fd, &file_size, sizeof(uint32_t), 0);
+            re = sendfile(timer->accept_fd, fileno(fp), &len, file_size) >= 0;
+            if(!re) perror("Sendfile");
         #endif
         printf("Send %lld bytes.\n", len);
-        close_dict(fp);
+        close_file(fp);
         timer->is_open = 0;
     }
     return re;
@@ -167,54 +150,47 @@ int sm1_pwd(THREADTIMER *timer) {
 int s0_init(THREADTIMER *timer) {
     if(!strcmp("get", timer->data)) timer->status = 1;
     else if(!strcmp("set" SETPASS, timer->data)) timer->status = 2;
-    else if(!strcmp("del" SETPASS, timer->data)) timer->status = 4;
-    else if(!strcmp("lst", timer->data)) timer->status = 5;
-    else if(!strcmp("cat", timer->data)) return send_all(timer);
+    else if(!strcmp("cat", timer->data)) return send_all(data_path, timer);
     else if(!strcmp("quit", timer->data)) return 0;
     return send_data(timer->accept_fd, timer->data, timer->numbytes);
 }
 
-int s1_get(THREADTIMER *timer) {
-    FILE *fp = open_dict(LOCK_SH);
-    DICTBLK dict;
+int s1_get(THREADTIMER *timer) {        //get kanban
+    FILE *fp = open_file(kanban_path, LOCK_SH, "rb");
     timer->status = 0;
     if(fp) {
         timer->fp = fp;
         timer->is_open = 1;
-        while(fread(&dict, DICTBLKSZ, 1, fp) > 0) {
-            u_char ks = dict.keysize;
-            dict.key[ks] = 0;
-            //printf("[%s] Look key: (%d)%s\n", timer->data, ks, dict.key);
-            if(!strcmp(timer->data, dict.key))
-                return close_and_send(timer, dict.data, dict.datasize);
+        uint32_t ver, cli_ver;
+        if(fscanf(fp, "%u", &ver) > 0) {
+            if(sscanf(timer->data, "%u", &cli_ver) > 0) {
+                if(cli_ver < ver) {     //need to send a new kanban
+                    close_file(fp);
+                    timer->is_open = 0;
+                    int r = send_all(kanban_path, timer);
+                    if(strstr(timer->data, "quit") == timer->data + timer->numbytes - 4) {
+                        puts("Found last cmd is quit.");
+                        return 0;
+                    }
+                    else return r;
+                }
+            }
         }
     }
-    return close_and_send(timer, "null", 4);
-}
-
-#define copyKey() {\
-    dict.keysize = (timer->numbytes >= (DATASIZE-1))?(DATASIZE-1):timer->numbytes;\
-    strncpy(dict.key, timer->data, (DATASIZE-1));\
+    return close_file_and_send(timer, "null", 4);
 }
 
 int s2_set(THREADTIMER *timer) {
-    FILE *fp = open_dict(LOCK_EX);
+    FILE *fp = NULL;
+    if(!strcmp(timer->data, "ver")) {
+        fp = open_file(kanban_path, LOCK_EX, "wb");
+    } else if(!strcmp(timer->data, "dat")) {
+        fp = open_file(data_path, LOCK_EX, "wb");
+    }
     if(fp) {
         timer->status = 3;
         timer->fp = fp;
         timer->is_open = 1;
-        while(fread(&dict, DICTBLKSZ, 1, fp) > 0) {
-            u_char ks = dict.keysize;
-            dict.key[ks] = 0;
-            //printf("[%zd] Key size: %d\n", timer->numbytes, ks);
-            if(!dict.keysize || !strcmp(timer->data, dict.key)) {
-                copyKey();
-                fseek(fp, -DICTBLKSZ, SEEK_CUR);
-                return send_data(timer->accept_fd, "data", 4);
-            }
-        }
-        copyKey();
-        fseek(fp, 0, SEEK_END);
         return send_data(timer->accept_fd, "data", 4);
     } else {
         timer->status = 0;
@@ -224,73 +200,49 @@ int s2_set(THREADTIMER *timer) {
 
 int s3_set_data(THREADTIMER *timer) {
     timer->status = 0;
-    dict.datasize = (timer->numbytes >= (DATASIZE-1))?(DATASIZE-1):timer->numbytes;
-    printf("Set data size: %d\n", dict.datasize);
-    memcpy(dict.data, timer->data, dict.datasize);
-    puts("Data copy to dict succ");
-    if(fwrite(&dict, DICTBLKSZ, 1, timer->fp) != 1) {
-        printf("Error set data: dict[%s]=%s\n", dict.key, timer->data);
-        return close_and_send(timer, "erro", 4);
-    } else {
-        printf("Set data: dict[%s]=%s\n", dict.key, timer->data);
-        return close_and_send(timer, "succ", 4);
-    }
-}
-
-int s4_del(THREADTIMER *timer) {
-    FILE *fp = open_dict(LOCK_EX);
-    DICTBLK dict;
-    timer->status = 0;
-    if(fp) {
-        timer->fp = fp;
-        timer->is_open = 1;
-        while(fread(&dict, DICTBLKSZ, 1, fp) > 0) {
-            dict.key[dict.keysize] = 0;
-            if(!strcmp(timer->data, dict.key)) {
-                fseek(fp, -DICTBLKSZ+(DATASIZE-1), SEEK_CUR);
-                fputc(0, fp);
-                return close_and_send(timer, "succ", 4);
-            }
+    uint32_t file_size = *(uint32_t*)(timer->data);
+    printf("Set data size: %u\n", file_size);
+    int is_first_data = 0;
+    if(timer->numbytes == sizeof(uint32_t)) {
+        if((timer->numbytes = recv(timer->accept_fd, timer->data, BUFSIZ, 0)) <= 0) 
+            return close_file_and_send(timer, "erro", 4);
+        else {
+            is_first_data = 1;
+            printf("Get data size: %tu\n", timer->numbytes);
         }
     }
-    return close_and_send(timer, "null", 4);
+    if(file_size <= BUFSIZ - (is_first_data?0:sizeof(uint32_t))) {
+        while(timer->numbytes != file_size - (is_first_data?0:sizeof(uint32_t))) {
+            timer->numbytes += recv(timer->accept_fd, timer->data + timer->numbytes + (is_first_data?0:sizeof(uint32_t)), BUFSIZ - timer->numbytes - (is_first_data?0:sizeof(uint32_t)), 0);
+        }
+        if(fwrite(timer->data + (is_first_data?0:sizeof(uint32_t)), file_size, 1, timer->fp) != 1) {
+            puts("Set data error.");
+            return close_file_and_send(timer, "erro", 4);
+        } else return close_file_and_send(timer, "succ", 4);
+    } else {
+        if(fwrite(timer->data + (is_first_data?0:sizeof(uint32_t)), timer->numbytes - (is_first_data?0:sizeof(uint32_t)), 1, timer->fp) != 1) {
+            puts("Set data error.");
+            return close_file_and_send(timer, "erro", 4);
+        }
+        int32_t remain = file_size - timer->numbytes;
+        while(remain > 0) {
+            printf("remain:%d\n", remain);
+            timer->numbytes = recv(timer->accept_fd, timer->data, BUFSIZ, 0);
+            if(fwrite(timer->data, timer->numbytes, 1, timer->fp) != 1) {
+                puts("Set data error.");
+                return close_file_and_send(timer, "erro", 4);
+            }
+            remain -= timer->numbytes;
+        }
+        return close_file_and_send(timer, "succ", 4);
+    }
+    return close_file_and_send(timer, "erro", 4);
 }
 
-off_t file_size_of(const char* fname) {
+off_t size_of_file(const char* fname) {
     struct stat statbuf;
     if(stat(fname, &statbuf)==0) return statbuf.st_size;
     else return -1;
-}
-
-int s5_list(THREADTIMER *timer) {
-    timer->status = 0;
-    off_t size = file_size_of(file_path) / DICTBLKSZ;
-    char *keys = calloc(size, DATASIZE);
-    DICTBLK dict;
-    FILE *fp = open_dict(LOCK_SH);
-    if(keys && fp) {
-        timer->fp = fp;
-        timer->is_open = 1;
-        keys[0] = 0;
-        while(fread(&dict, DICTBLKSZ, 1, fp) > 0) {
-            u_char ks = dict.keysize;
-            dict.key[ks] = 0;
-            //printf("[%s] Look key: (%d)%s\n", timer->data, ks, dict.key);
-            if(strstr(dict.key, timer->data)) {
-                strcat(keys, dict.key);
-                strcat(keys, "\n");
-            }
-        }
-        int len = strlen(keys);
-        close_dict(fp);
-        timer->is_open = 0;
-        if(len > 0) return free_after_send(timer->accept_fd, keys, len);
-        else return send_data(timer->accept_fd, "null", 4);
-    } else {
-        if(fp) close_dict(fp);
-        timer->is_open = 0;
-        return send_data(timer->accept_fd, "erro", 4);
-    }
 }
 
 int check_buffer(THREADTIMER *timer) {
@@ -301,8 +253,6 @@ int check_buffer(THREADTIMER *timer) {
         case 1: return s1_get(timer); break;
         case 2: return s2_set(timer); break;
         case 3: return s3_set_data(timer); break;
-        case 4: return s4_del(timer); break;
-        case 5: return s5_list(timer); break;
         default: return -1; break;
     }
 }
@@ -348,7 +298,7 @@ void kill_thread(THREADTIMER* timer) {
         puts("Free data.");
     }
     if(timer->is_open) {
-        close_dict(timer->fp);
+        close_file(timer->fp);
         timer->is_open = 0;
         puts("Close file.");
     }
@@ -358,6 +308,22 @@ void kill_thread(THREADTIMER* timer) {
 void handle_pipe(int signo) {
     printf("Pipe error: %d\n", signo);
 }
+
+#define chkbuf(p) if(!check_buffer(timer_pointer_of(p))) break
+
+#define take_word(p, w) if(timer_pointer_of(p)->numbytes > strlen(w) && strstr(buff, w) == buff) {\
+                        int l = strlen(w);\
+                        char store = buff[l];\
+                        buff[l] = 0;\
+                        ssize_t n = timer_pointer_of(p)->numbytes - l;\
+                        timer_pointer_of(p)->numbytes = l;\
+                        chkbuf(p);\
+                        buff[0] = store;\
+                        memmove(buff + 1, buff + l + 1, n - 1);\
+                        buff[n] = 0;\
+                        timer_pointer_of(p)->numbytes = n;\
+                        printf("Split cmd: %s\n", w);\
+                    }
 
 void handle_accept(void *p) {
     pthread_detach(pthread_self());
@@ -369,7 +335,7 @@ void handle_accept(void *p) {
         pthread_t thread;
         if (pthread_create(&thread, NULL, (void *)&accept_timer, p)) puts("Error creating timer thread");
         else puts("Creating timer thread succeeded");
-        send_data(accept_fd, "Welcome to simple dict server.", 31);
+        send_data(accept_fd, "Welcome to simple kanban server.", 33);
         timer_pointer_of(p)->status = -1;
         char *buff = calloc(BUFSIZ, sizeof(char));
         if(buff) {
@@ -377,9 +343,17 @@ void handle_accept(void *p) {
             while(*(timer_pointer_of(p)->thread) && (timer_pointer_of(p)->numbytes = recv(accept_fd, buff, BUFSIZ, 0)) > 0) {
                 touch_timer(p);
                 buff[timer_pointer_of(p)->numbytes] = 0;
-                printf("Get %zd bytes: %s\n", timer_pointer_of(p)->numbytes, buff);
+                printf("Get %d bytes: %s\n", timer_pointer_of(p)->numbytes, buff);
                 puts("Check buffer");
-                if(!check_buffer(timer_pointer_of(p))) break;
+                //处理部分粘连
+                take_word(p, PASSWORD);
+                take_word(p, "get");
+                take_word(p, "cat");
+                take_word(p, "quit");
+                take_word(p, "set" SETPASS);
+                take_word(p, "ver");
+                take_word(p, "dat");
+                if(timer_pointer_of(p)->numbytes > 0) chkbuf(p);
             }
             printf("Break: recv %zd bytes\n", timer_pointer_of(p)->numbytes);
         } else puts("Error allocating buffer");
@@ -423,27 +397,27 @@ void accept_client() {
     }
 }
 
-FILE *open_dict(int lock_type) {
+FILE *open_file(char* file_path, int lock_type, char* mode) {
     FILE *fp = NULL;
-    fp = fopen(file_path, (lock_type == LOCK_SH)?"rb":"rb+");
+    fp = fopen(file_path, mode);
     if(fp) {
         if(!~flock(fileno(fp), lock_type | LOCK_NB)) {
             printf("Error: ");
             fp = NULL;
         }
-        printf("Open dict in mode %d\n", lock_type);
-    } else puts("Open dict error");
+        printf("Open file in mode %d\n", lock_type);
+    } else puts("Open file error");
     return fp;
 }
 
-int close_and_send(THREADTIMER *timer, char *data, size_t numbytes) {
-    close_dict(timer->fp);
+int close_file_and_send(THREADTIMER *timer, char *data, size_t numbytes) {
+    close_file(timer->fp);
     timer->is_open = 0;
     return send_data(timer->accept_fd, data, numbytes);
 }
 
-void close_dict(FILE *fp) {
-    puts("Close dict");
+void close_file(FILE *fp) {
+    puts("Close file");
     if(fp) {
         flock(fileno(fp), LOCK_UN);
         fclose(fp);
@@ -451,7 +425,7 @@ void close_dict(FILE *fp) {
 }
 
 int main(int argc, char *argv[]) {
-    if(argc != 4 && argc != 5) showUsage(argv[0]);
+    if(argc != 5 && argc != 6) showUsage(argv[0]);
     else {
         int port = 0;
         int as_daemon = !strcmp("-d", argv[1]);
@@ -465,10 +439,17 @@ int main(int argc, char *argv[]) {
                     fp = fopen(argv[as_daemon?4:3], "rb+");
                     if(!fp) fp = fopen(argv[as_daemon?4:3], "wb+");
                     if(fp) {
-                        file_path = argv[as_daemon?4:3];
+                        kanban_path = argv[as_daemon?4:3];
                         fclose(fp);
-                        if(bind_server(port, times)) if(listen_socket(times)) accept_client();
-                    } else printf("Error opening dict file: %s\n", argv[as_daemon?4:3]);
+                        fp = NULL;
+                        fp = fopen(argv[as_daemon?5:4], "rb+");
+                        if(!fp) fp = fopen(argv[as_daemon?5:4], "wb+");
+                        if(fp) {
+                            data_path = argv[as_daemon?5:4];
+                            fclose(fp);
+                            if(bind_server(port, times)) if(listen_socket(times)) accept_client();
+                        }
+                    } else printf("Error opening kanban file: %s\n", argv[as_daemon?4:3]);
                 } else puts("Start daemon error");
             } else printf("Error times: %d\n", times);
         } else printf("Error port: %d\n", port);

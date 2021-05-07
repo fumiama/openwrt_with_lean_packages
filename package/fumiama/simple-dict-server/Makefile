@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=simple-dict-server
-PKG_RELEASE:=3.0
+PKG_RELEASE:=3.1
 CMAKE_INSTALL:=1
 
 include $(INCLUDE_DIR)/package.mk
