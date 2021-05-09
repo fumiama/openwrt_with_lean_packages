@@ -7,14 +7,14 @@
 # <https://github.com/KFERMercer/OpenWrt-CI>
 #
 
-name: OpenWrt-CI
+name: WNDR4300V1
 
 on:
   push:
     branches: 
       - master
-    schedule:
-      - cron: 0 20 1 * *    #每月一日晚八点
+  schedule:
+    - cron: 0 20 1 * *    #每月一日晚八点
   release:
     types: [published]
 
@@ -88,7 +88,7 @@ jobs:
           cp ./.config.wndr4300 ./.config
 
           sed -i 's/^[ \t]*//g' ./.config
-          make defconfig
+          # make defconfig
 
       - name: Make download
         run: |
