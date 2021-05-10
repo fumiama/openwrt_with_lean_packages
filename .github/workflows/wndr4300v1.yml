@@ -69,9 +69,7 @@ jobs:
           rm -f ./.config*
           touch ./.config
 
-          #
           # 在 cat >> .config <<EOF 到 EOF 之间粘贴你的编译配置, 需注意缩进关系
-          # 例如:
 
           cat >> .config <<EOF
           CONFIG_TARGET_ath79=y
@@ -225,6 +223,7 @@ jobs:
           CONFIG_PACKAGE_libsysfs=y
           CONFIG_PACKAGE_libubus-lua=y
           CONFIG_PACKAGE_libuci-lua=y
+          CONFIG_PACKAGE_libucl=y
           CONFIG_PACKAGE_libunrar=y
           CONFIG_PACKAGE_libuuid=y
           CONFIG_PACKAGE_libzip-gnutls=y
@@ -302,11 +301,15 @@ jobs:
           CONFIG_PACKAGE_trojan=y
           CONFIG_PACKAGE_uhttpd=y
           CONFIG_PACKAGE_uhttpd-mod-ubus=y
+          CONFIG_PACKAGE_unrar=y
+          CONFIG_PACKAGE_unzip=y
+          CONFIG_PACKAGE_upx=y
           CONFIG_PACKAGE_v2ray-plugin=y
           CONFIG_PACKAGE_vlmcsd=y
           CONFIG_PACKAGE_wget=y
           CONFIG_PACKAGE_wol=y
           CONFIG_PACKAGE_xray-core=y
+          CONFIG_PACKAGE_zstd=y
           # CONFIG_SIGNATURE_CHECK is not set
           CONFIG_SQLITE3_DYNAMIC_EXTENSIONS=y
           CONFIG_SQLITE3_FTS3=y
@@ -332,6 +335,7 @@ jobs:
 
       - name: Compile firmware
         run: |
+          make package/fumiama/upx/upx/compile V=s
           make -j1 V=s
           echo "======================="
           echo "Space usage:"
