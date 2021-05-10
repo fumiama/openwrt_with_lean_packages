@@ -19,3 +19,6 @@
 [submodule "package/fumiama/luci-theme-rosy"]
 	path = package/fumiama/luci-theme-rosy
 	url = https://github.com/fumiama/luci-theme-rosy.git
+[submodule "package/fumiama/passwall"]
+	path = package/fumiama/passwall
+	url = https://github.com/xiaorouji/openwrt-passwall.git
