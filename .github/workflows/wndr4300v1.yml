@@ -34,6 +34,9 @@ jobs:
         run: |
           git clone --recursive https://github.com/fumiama/openwrt_with_lean_packages
           cd openwrt_with_lean_packages
+          cp -a ./* ../
+          cd ..
+          rm -rf openwrt_with_lean_packages
 
       - name: Space cleanup
         run: |
