@@ -333,7 +333,7 @@ jobs:
 
       - name: Compile firmware
         run: |
-          ln /usr/bin/upx ./staging_dir/host/bin/
+          sudo ln /usr/bin/upx ./staging_dir/host/bin/
           make -j$(nproc) || make -j1 V=s
           echo "======================="
           echo "Space usage:"
