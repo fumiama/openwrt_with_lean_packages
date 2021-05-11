@@ -31,15 +31,11 @@ jobs:
     steps:
 
       - name: Checkout
-        env:
-          DEBIAN_FRONTEND: noninteractive
         run: |
           git clone --recursive https://github.com/fumiama/openwrt_with_lean_packages
           cd openwrt_with_lean_packages
 
       - name: Space cleanup
-        env:
-          DEBIAN_FRONTEND: noninteractive
         run: |
           docker rmi `docker images -q`
           sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/apt/sources.list.d
