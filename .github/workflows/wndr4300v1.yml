@@ -31,10 +31,10 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
-          submodules: 'recursive'
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          git clone --recursive https://github.com/fumiama/openwrt_with_lean_packages
 
       - name: Space cleanup
         env:
