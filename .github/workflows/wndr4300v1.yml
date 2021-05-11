@@ -333,9 +333,8 @@ jobs:
 
       - name: Compile firmware
         run: |
-          make package/fumiama/upx/upx/compile V=s
           ln /usr/bin/upx ./staging_dir/host/bin/
-          make -j1 V=s
+          make -j$(nproc) || make -j1 V=s
           echo "======================="
           echo "Space usage:"
           echo "======================="
