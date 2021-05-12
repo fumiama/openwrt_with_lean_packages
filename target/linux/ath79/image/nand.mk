@@ -202,7 +202,7 @@ define Device/netgear_wndr3700-v4
 endef
 TARGET_DEVICES += netgear_wndr3700-v4
 
-define Device/netgear_wndr4300_128m
+define Device/netgear_wndr4300
   SOC := ar9344
   DEVICE_MODEL := WNDR4300
   UIMAGE_MAGIC := 0x33373033
@@ -210,7 +210,7 @@ define Device/netgear_wndr4300_128m
   NETGEAR_HW_ID := 29763948+0+128+128+2x2+3x3
   $(Device/netgear_ath79_nand_128m)
 endef
-TARGET_DEVICES += netgear_wndr4300_128m
+TARGET_DEVICES += netgear_wndr4300
 
 define Device/zyxel_nbg6716
   SOC := qca9558
