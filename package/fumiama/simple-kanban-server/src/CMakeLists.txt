@@ -14,6 +14,7 @@ endif()
 add_definitions(-DLISTEN_ON_IPV6)
 
 ADD_EXECUTABLE(simple-kanban-server simple-kanban-server.c)
-TARGET_LINK_LIBRARIES(simple-kanban-server pthread)
+add_library(spb STATIC protobuf.c)
+TARGET_LINK_LIBRARIES(simple-kanban-server spb pthread)
 
 INSTALL(TARGETS simple-kanban-server RUNTIME DESTINATION bin)

@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=simple-kanban-server
-PKG_RELEASE:=1.2.5
+PKG_RELEASE:=1.3
 CMAKE_INSTALL:=1
 
 include $(INCLUDE_DIR)/package.mk
@@ -32,7 +32,7 @@ define Package/simple-kanban-server/postinst
 	sed -i '/simple-kanban-server/d' /etc/rc.local
 	mkdir -p /home/nobody
 	chown 65534:65534 /home/nobody
-	echo "/usr/bin/simple-kanban-server -d 12315 1 /home/nobody/kanban /home/nobody/data 2>&1 > /dev/null" >> /etc/rc.local
+	echo "#/usr/bin/simple-kanban-server -d 12315 1 /home/nobody/kanban /home/nobody/data /home/nobody/cfg.sp 2>&1 > /dev/null" >> /etc/rc.local
 	echo "exit 0" >> /etc/rc.local
 	exit 0
 endef
