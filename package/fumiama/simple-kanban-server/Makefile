@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=simple-kanban-server
-PKG_RELEASE:=1.3
+PKG_RELEASE:=1.4.1
 CMAKE_INSTALL:=1
 
 include $(INCLUDE_DIR)/package.mk
@@ -10,7 +10,7 @@ include $(INCLUDE_DIR)/cmake.mk
 define Package/simple-kanban-server
   SECTION:=utils
   CATEGORY:=Server
-  DEPENDS:=+libpthread
+  DEPENDS:=+libpthread +libspb
   TITLE:=simple-kanban-server
   MAINTAINER:=fumiama
 endef
