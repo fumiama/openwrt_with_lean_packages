@@ -1,8 +1,18 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=simple-kanban-server
-PKG_RELEASE:=1.4.1
+PKG_RELEASE:=1.4.2
 CMAKE_INSTALL:=1
+
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_DATE:=2021-05-19
+PKG_SOURCE_VERSION:=226d690c20695c709b3ede151f3b758b4d5857ea
+PKG_SOURCE_URL:=https://github.com/fumiama/simple-kanban.git
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_SOURCE_DATE).tar.gz
+
+PKG_MAINTAINER:=Fumiama <nbd@nbd.name>
+PKG_LICENSE:=MIT
+PKG_LICENSE_FILES:=COPYING
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
@@ -21,7 +31,7 @@ endef
 
 define Package/simple-kanban-server/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/simple-kanban-server $(1)/usr/bin/
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/simple-kanban-server $(1)/usr/bin/
 endef
 
 define Package/simple-kanban-server/postinst
