@@ -4192,6 +4192,7 @@ CONFIG_PACKAGE_libreadline=y
 # CONFIG_PACKAGE_libslang2-mod-zlib is not set
 # CONFIG_PACKAGE_libslang2-modules is not set
 # CONFIG_PACKAGE_libsmartcols is not set
+CONFIG_PACKAGE_libsmd5=m
 # CONFIG_PACKAGE_libsndfile is not set
 # CONFIG_PACKAGE_libsoc is not set
 # CONFIG_PACKAGE_libsocks is not set
@@ -5965,6 +5966,8 @@ CONFIG_XRAY_PLUGIN_COMPRESS_UPX=y
 #
 # Server
 #
+CONFIG_PACKAGE_cmoe=m
+CONFIG_PACKAGE_shttps=m
 CONFIG_PACKAGE_simple-dict-server=m
 CONFIG_PACKAGE_simple-kanban-server=m
 # end of Server
